@@ -58,7 +58,10 @@ class TaskProcessor final {
 
   const impl::TaskCounter& GetTaskCounter() const { return task_counter_; }
 
-  size_t GetTaskQueueSize() const { return task_queue_.GetSizeApproximate(); }
+  size_t GetTaskQueueSize() const {
+    return std::visit([](auto&& arg) { return arg.GetSizeApproximate(); },
+                      task_queue_);
+  }
 
   size_t GetWorkerCount() const { return workers_.size(); }
 

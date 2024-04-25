@@ -18,6 +18,8 @@ enum class OsScheduling {
   kIdle,
 };
 
+enum class TaskProcessorQueue { kMoodyCamelTaskQueue, kWorkStealingTaskQueue };
+
 OsScheduling Parse(const yaml_config::YamlConfig& value,
                    formats::parse::To<OsScheduling>);
 
