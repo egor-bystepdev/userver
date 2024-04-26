@@ -82,8 +82,6 @@ void TaskProcessorThreadStartedHook() {
   EmitMagicNanosleep();
 }
 
-/*
-// will be used after passing tests by `WorkStealingTaskQueue`
 auto MakeTaskQueue(TaskProcessorConfig config) {
   using ResultType = std::variant<TaskQueue, WorkStealingTaskQueue>;
   switch (config.task_processor_queue) {
@@ -94,7 +92,6 @@ auto MakeTaskQueue(TaskProcessorConfig config) {
   }
   UINVARIANT(false, "Unexpected value of ... enum");
 }
-*/
 
 }  // namespace
 
