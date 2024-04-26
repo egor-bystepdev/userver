@@ -18,10 +18,13 @@ enum class OsScheduling {
   kIdle,
 };
 
-enum class TaskProcessorQueue { kMoodyCamelTaskQueue, kWorkStealingTaskQueue };
+enum class TaskQueueType { kGlobalTaskQueue, kWorkStealingTaskQueue };
 
 OsScheduling Parse(const yaml_config::YamlConfig& value,
                    formats::parse::To<OsScheduling>);
+
+TaskQueueType Parse(const yaml_config::YamlConfig& value,
+                    formats::parse::To<TaskQueueType>);
 
 struct TaskProcessorConfig {
   std::string name;

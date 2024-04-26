@@ -83,6 +83,20 @@ void TaskProcessorThreadStartedHook() {
   EmitMagicNanosleep();
 }
 
+/*
+// will be used after passing tests by `WorkStealingTaskQueue`
+auto MakeTaskQueue(TaskProcessorConfig config) {
+  using ResultType = std::variant<TaskQueue, WorkStealingTaskQueue>;
+  switch (config.task_processor_queue) {
+    case TaskQueueType::kGlobalTaskQueue:
+      return ResultType{std::in_place_index<0>, std::move(config)};
+    case TaskQueueType::kWorkStealingTaskQueue:
+      return ResultType{std::in_place_index<1>, std::move(config)};
+  }
+  UINVARIANT(false, "Unexpected value of ... enum");
+}
+*/
+
 }  // namespace
 
 TaskProcessor::TaskProcessor(TaskProcessorConfig config,
@@ -93,10 +107,6 @@ TaskProcessor::TaskProcessor(TaskProcessorConfig config,
       pools_(std::move(pools)) {
   utils::impl::FinishStaticRegistration();
   try {
-    if (config.task_processor_queue ==
-        engine::TaskProcessorQueue::kMoodyCamelTaskQueue) {
-      task_queue_.emplace<0>(config);
-    }
     LOG_INFO() << "creating task_processor " << Name() << " "
                << "worker_threads=" << config_.worker_threads
                << " thread_name=" << config_.thread_name;
