@@ -398,14 +398,31 @@ void TaskProcessor::HandleOverload(
   }
 }
 
-void TaskProcessor::UpdateTaskQueueSize() {
-  thread_local std::atomic<std::size_t> steps_count{0};
-  auto curr = steps_count.fetch_add(1, std::memory_order_relaxed) + 1;
-  if (curr >= workers_.size()) {
-    auto new_size = std::visit(
-        [](auto&& arg) { return arg.GetSizeApproximate(); }, task_queue_);
-    task_queue_size_.store(new_size, std::memory_order_relaxed);
-    steps_count.store(0, std::memory_order_relaxed);
+bool TaskProcessor::IsOverloadedByLength() {
+  bool overloaded_by_length = overloaded_by_length_cache_.load();
+  const int factor = overloaded_by_length ? 4 : 16;
+
+  if (utils::RandRange(factor) != 0) {
+    return overloaded_by_length;
+  }
+
+  overloaded_by_length = ComputeIsOverloadedByLength(overloaded_by_length);
+  overloaded_by_length_cache_.store(overloaded_by_length,
+                                    std::memory_order_relaxed);
+  return overloaded_by_length;
+}
+
+bool TaskProcessor::ComputeIsOverloadedByLength(
+    const bool current_overloaded_status) {
+  static constexpr long double kExitOverloadStatusFactor = 0.95;
+  const auto queue_size = GetTaskQueueSize();
+  task_queue_size_cache_.store(queue_size, std::memory_order_relaxed);
+  if (current_overloaded_status) {
+    return (queue_size >=
+            static_cast<std::size_t>(kExitOverloadStatusFactor *
+                                     max_task_queue_wait_length_));
+  } else {
+    return (queue_size >= max_task_queue_wait_length_);
   }
 }
 
