@@ -332,7 +332,7 @@ private:
 	}
 
 public:
-	LightweightSemaphore(ssize_t initialCount = 0, int maxSpins = 4000) : m_count(initialCount), m_maxSpins(maxSpins)
+	LightweightSemaphore(ssize_t initialCount = 0, int maxSpins = 10000) : m_count(initialCount), m_maxSpins(maxSpins)
 	{
 		assert(initialCount >= 0);
 		assert(maxSpins >= 0);
