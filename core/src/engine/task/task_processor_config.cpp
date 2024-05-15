@@ -50,8 +50,8 @@ TaskQueueType Parse(const yaml_config::YamlConfig& value,
   static constexpr utils::TrivialBiMap kMap([](auto selector) {
     return selector()
         .Case(TaskQueueType::kGlobalTaskQueue, "global-task-queue")
-        .Case(TaskQueueType::kWorkStealingTaskQueue,
-              "work-stealing-task-queue");
+        .Case(TaskQueueType::kWorkStealingTaskQueue, "work-stealing-task-queue")
+        .Case(TaskQueueType::kPushStrategyTaskQueue, "push-strategy-task-queue");
   });
 
   return utils::ParseFromValueString(value, kMap);

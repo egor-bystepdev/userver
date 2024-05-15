@@ -18,6 +18,7 @@
 #include <engine/task/task_context.hpp>
 #include <engine/task/task_processor_pools.hpp>
 #include <engine/task/work_stealing_queue/task_queue.hpp>
+#include <engine/task/push_strategy_queue/task_queue.hpp>
 
 USERVER_NAMESPACE_BEGIN
 
@@ -65,12 +66,14 @@ void TaskProcessorThreadStartedHook() {
 }
 
 auto MakeTaskQueue(TaskProcessorConfig config) {
-  using ResultType = std::variant<TaskQueue, WorkStealingTaskQueue>;
+  using ResultType = std::variant<TaskQueue, WorkStealingTaskQueue, PushStrategyTaskQueue>;
   switch (config.task_processor_queue) {
     case TaskQueueType::kGlobalTaskQueue:
       return ResultType{std::in_place_index<0>, std::move(config)};
     case TaskQueueType::kWorkStealingTaskQueue:
       return ResultType{std::in_place_index<1>, std::move(config)};
+    case TaskQueueType::kPushStrategyTaskQueue:
+      return ResultType{std::in_place_index<2>, std::move(config)};
   }
   UINVARIANT(false, "Unexpected value of ... enum");
 }
