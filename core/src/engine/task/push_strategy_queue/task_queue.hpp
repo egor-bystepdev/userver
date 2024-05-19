@@ -23,6 +23,8 @@ enum SleepState : std::uint32_t {
     kSleeping
 };
 
+std::string SleepStateToString(const SleepState& sleepState);
+
 class PushStrategyTaskQueue {
 
  public:
@@ -36,6 +38,8 @@ class PushStrategyTaskQueue {
 
   std::size_t GetSizeApproximate() const noexcept;
 
+  ~PushStrategyTaskQueue();
+
  private:
   void DoPush(impl::TaskContext* context);
   impl::TaskContext* DoPopBlocking();
@@ -47,6 +51,10 @@ class PushStrategyTaskQueue {
   utils::FixedArray<std::atomic<SleepState>> sleep_state_; 
   moodycamel::ConcurrentQueue<impl::TaskContext*> global_queue_;
   std::atomic<std::size_t> workers_order_{0};
+
+
+  std::atomic<std::size_t> spinning_hops{0}, sleep_hops{0}, queue_hops{0};
+  // std::atomic<std::size_t> ;
 };
 
 }  // namespace engine

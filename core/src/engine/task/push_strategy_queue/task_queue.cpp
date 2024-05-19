@@ -1,6 +1,8 @@
+#include <iostream>
 #include <engine/task/push_strategy_queue/task_queue.hpp>
 
 #include <engine/task/task_context.hpp>
+#include <string>
 
 #ifdef __linux__
 #include <linux/futex.h>
@@ -31,6 +33,18 @@ void FutexWakeTaskContextPtr(std::atomic<impl::TaskContext*>* value, int count) 
 }  // namespace
 #endif
 
+std::string SleepStateToString(const SleepState& sleepState) {
+  switch (sleepState) {
+    case kBusy:
+      return "kBusy";
+    case kSpinning:
+      return "kSpinning";
+    case kSleeping:
+      return "kSleeping";
+    default:
+      return "kUnknown";
+  }
+}
 
 namespace {
 // It is only used in worker threads outside of any coroutine,
@@ -44,6 +58,7 @@ PushStrategyTaskQueue::PushStrategyTaskQueue(const TaskProcessorConfig& config)
     current_task_(config.worker_threads, nullptr),
     sleep_state_(config.worker_threads, SleepState::kBusy)
 {
+  std::cout << "constructor\n" << std::flush;
 }
 
 void PushStrategyTaskQueue::Push(boost::intrusive_ptr<impl::TaskContext>&& context) {
@@ -62,7 +77,11 @@ boost::intrusive_ptr<impl::TaskContext> PushStrategyTaskQueue::PopBlocking() {
 }
 
 void PushStrategyTaskQueue::StopProcessing() {
+  std::cout << "------TERMINATE------\n" << std::flush;
   is_terminate_.store(true);
+  for (size_t i = 0; i < workers_count_; ++i) {
+      FutexWakeTaskContextPtr(&current_task_[i], 1);
+  }
 }
 
 std::size_t PushStrategyTaskQueue::GetSizeApproximate() const noexcept {
@@ -81,6 +100,8 @@ void PushStrategyTaskQueue::DoPush(impl::TaskContext* context) {
       if (current_task_[workerIndex].compare_exchange_strong(expected_value, context)) {
         // if worker fell asleep at last moment
         FutexWakeTaskContextPtr(&current_task_[workerIndex], 1);
+        // auto s = "[PUSH] " + std::to_string(localWorkerIndex) + " to worker " + std::to_string(workerIndex) + " " + SleepStateToString(state) + "\n";
+        // std::cout << s << std::flush;
         return true;
       }
     }
@@ -89,27 +110,37 @@ void PushStrategyTaskQueue::DoPush(impl::TaskContext* context) {
   // try to give task first to spinning workers
   for (size_t i = start_index; i < workers_count_; ++i) {
     if (try_give_task(i, kSpinning)) {
+      spinning_hops.fetch_add(1);
       return;
     }
   }
   for (size_t i = 0; i < start_index; ++i) {
     if (try_give_task(i, kSpinning)) {
+      spinning_hops.fetch_add(1);
       return;
     }
   }
 
   for (size_t i = start_index; i < workers_count_; ++i) {
     if (try_give_task(i, kSleeping)) {
+      sleep_hops.fetch_add(1);
       return;
     }
   }
   for (size_t i = 0; i < start_index; ++i) {
     if (try_give_task(i, kSleeping)) {
+      sleep_hops.fetch_add(1);
       return;
     }
   }
   // this point all workers busy
-  global_queue_.enqueue(context);
+  // std::cout << "[PUSH] " + std::to_string(localWorkerIndex) + " to global queue. past size=" + std::to_string(global_queue_.size_approx()) + "\n" << std::flush;
+  queue_hops.fetch_add(1);
+  for (size_t i = 0; i < workers_count_; ++i) {
+    FutexWakeTaskContextPtr(&current_task_[i], 1);
+  }
+  assert(global_queue_.enqueue(context));
+  // FutexWakeTaskContextPtr(&current_task_[workerIndex], 1);
   // ??? wake some workers
 }
 
@@ -121,6 +152,10 @@ impl::TaskContext* PushStrategyTaskQueue::DoPopBlocking() {
   int spinCount = 0;
   impl::TaskContext* item = nullptr;
 
+  auto sleepStateInfo = [](SleepState from, SleepState to) {
+    return std::to_string(localWorkerIndex) + " " + SleepStateToString(from) + "-->" + SleepStateToString(to);
+  };
+  // std::cout << sleepStateInfo(sleep_state_[localWorkerIndex], kSpinning) + "\n" << std::flush;
   sleep_state_[localWorkerIndex].store(kSpinning);
 
   while (true) {
@@ -130,6 +165,7 @@ impl::TaskContext* PushStrategyTaskQueue::DoPopBlocking() {
     }
     while (spinCount--) {
       if (current_task_[localWorkerIndex].load() != nullptr) {
+        // std::cout << sleepStateInfo(sleep_state_[localWorkerIndex], kBusy) + " SPIN\n" << std::flush;
         sleep_state_[localWorkerIndex].store(kBusy);
         item = current_task_[localWorkerIndex].load();
         assert(current_task_[localWorkerIndex].compare_exchange_strong(item, nullptr));
@@ -143,19 +179,22 @@ impl::TaskContext* PushStrategyTaskQueue::DoPopBlocking() {
           // this moment can be given task in current_task_,
           // so we should check it and process only one of two available tasks
           if (!current_task_[localWorkerIndex].compare_exchange_strong(second_task, item)) {
-            global_queue_.enqueue(item);
+            assert(global_queue_.enqueue(item));
             item = second_task;
           }
+          // std::cout << sleepStateInfo(sleep_state_[localWorkerIndex], kBusy) + " GLOBAL\n" << std::flush;
           sleep_state_[localWorkerIndex].store(kBusy);
           assert(current_task_[localWorkerIndex].compare_exchange_strong(item, nullptr));
           return item;
         }
       }
     }
+    // std::cout << sleepStateInfo(sleep_state_[localWorkerIndex], kSleeping) + " queue size=" + std::to_string(global_queue_.size_approx()) + "\n" << std::flush;
     sleep_state_[localWorkerIndex].store(kSleeping);
     while (current_task_[localWorkerIndex].load() == nullptr && !is_terminate_.load()) {
       FutexWaitTaskContextPtr(&current_task_[localWorkerIndex], nullptr);
     }
+    // std::cout << sleepStateInfo(sleep_state_[localWorkerIndex], kSpinning) + " wake\n" << std::flush;
     sleep_state_[localWorkerIndex].store(kSpinning);
   }
 }
@@ -168,6 +207,12 @@ void PushStrategyTaskQueue::DetermineWorker() {
   localWorkerIndex = index;
 }
 
+  PushStrategyTaskQueue::~PushStrategyTaskQueue() {
+    std::cout << "spinning_hops=" << spinning_hops.load() << "\n";
+    std::cout << "sleep_hops=" << sleep_hops.load() << "\n";
+    std::cout << "queue_hops=" << queue_hops.load() << "\n";
+    std::cout << std::flush;
+  }
 }  // namespace engine
 
 USERVER_NAMESPACE_END
