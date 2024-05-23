@@ -31,9 +31,6 @@ class WorkStealingTaskQueue final {
   boost::intrusive_ptr<impl::TaskContext> PopBlocking();
 
   void StopProcessing();
-
-  std::size_t GetSize() const noexcept;
-
   std::size_t GetSizeApproximate() const noexcept;
 
   void PrepareWorker(std::size_t index);
@@ -45,15 +42,12 @@ class WorkStealingTaskQueue final {
 
   Consumer* GetConsumer();
 
-  void UpdateQueueSize();
-
   const std::size_t consumers_count_;
 
   GlobalQueue global_queue_;
   GlobalQueue background_queue_;
   utils::FixedArray<Consumer> consumers_;
   ConsumersManager consumers_manager_;
-  std::atomic<std::size_t> queue_size_cached_{0};
 };
 
 }  // namespace engine

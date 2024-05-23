@@ -58,17 +58,8 @@ class TaskProcessor final {
 
   const impl::TaskCounter& GetTaskCounter() const { return task_counter_; }
 
-  // This method is much slower,
-  // but more accurate than GetTaskQueueSizeApproximate()
   size_t GetTaskQueueSize() const {
-    return std::visit([](auto&& arg) { return arg.GetSize(); }, task_queue_);
-  }
-
-  // This method is much faster,
-  // but less accurate than GetTaskQueueSize()
-  size_t GetTaskQueueSizeApproximate() const {
-    return std::visit([](auto&& arg) { return arg.GetSizeApproximate(); },
-                      task_queue_);
+    return std::visit([](auto&& arg) { return arg.GetSizeApproximate(); }, task_queue_);
   }
 
   size_t GetWorkerCount() const { return workers_.size(); }
@@ -107,7 +98,7 @@ class TaskProcessor final {
       detached_contexts_{impl::DetachedTasksSyncBlock::StopMode::kCancel};
   concurrent::impl::InterferenceShield<std::atomic<bool>>
       task_queue_wait_time_overloaded_{false};
-  TaskQueue task_queue_;
+  std::variant<TaskQueue, WorkStealingTaskQueue> task_queue_;
   impl::TaskCounter task_counter_;
 
   const TaskProcessorConfig config_;

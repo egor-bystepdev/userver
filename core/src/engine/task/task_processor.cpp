@@ -98,7 +98,7 @@ auto MakeTaskQueue(TaskProcessorConfig config) {
 
 TaskProcessor::TaskProcessor(TaskProcessorConfig config,
                              std::shared_ptr<impl::TaskProcessorPools> pools)
-    : task_queue_(config),
+    : task_queue_(MakeTaskQueue(config)),
       task_counter_(config.worker_threads),
       config_(std::move(config)),
       pools_(std::move(pools)) {
@@ -395,34 +395,6 @@ void TaskProcessor::HandleOverload(
                   << " was waiting in queue for too long, but it is marked "
                      "as critical, not cancelling.";
     }
-  }
-}
-
-bool TaskProcessor::IsOverloadedByLength() {
-  bool overloaded_by_length = overloaded_by_length_cache_.load();
-  const int factor = overloaded_by_length ? 4 : 16;
-
-  if (utils::RandRange(factor) != 0) {
-    return overloaded_by_length;
-  }
-
-  overloaded_by_length = ComputeIsOverloadedByLength(overloaded_by_length);
-  overloaded_by_length_cache_.store(overloaded_by_length,
-                                    std::memory_order_relaxed);
-  return overloaded_by_length;
-}
-
-bool TaskProcessor::ComputeIsOverloadedByLength(
-    const bool current_overloaded_status) {
-  static constexpr long double kExitOverloadStatusFactor = 0.95;
-  const auto queue_size = GetTaskQueueSize();
-  task_queue_size_cache_.store(queue_size, std::memory_order_relaxed);
-  if (current_overloaded_status) {
-    return (queue_size >=
-            static_cast<std::size_t>(kExitOverloadStatusFactor *
-                                     max_task_queue_wait_length_));
-  } else {
-    return (queue_size >= max_task_queue_wait_length_);
   }
 }
 
