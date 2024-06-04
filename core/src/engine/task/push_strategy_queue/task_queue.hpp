@@ -49,6 +49,7 @@ class PushStrategyTaskQueue {
   std::atomic<int> is_terminate_;
   utils::FixedArray<std::atomic<impl::TaskContext*>> current_task_;
   utils::FixedArray<std::atomic<SleepState>> sleep_state_; 
+  utils::FixedArray<std::atomic<uint32_t>> sleep_variable_; 
   moodycamel::ConcurrentQueue<impl::TaskContext*> global_queue_;
   std::atomic<std::size_t> workers_order_{0};
 
