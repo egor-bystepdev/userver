@@ -177,6 +177,7 @@ properties:
                     enum:
                       - global-task-queue
                       - work-stealing-task-queue
+                      - push-strategy-task-queue
                 task-trace:
                     type: object
                     description: .

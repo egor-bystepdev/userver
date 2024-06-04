@@ -18,7 +18,7 @@ enum class OsScheduling {
   kIdle,
 };
 
-enum class TaskQueueType { kGlobalTaskQueue, kWorkStealingTaskQueue };
+enum class TaskQueueType { kGlobalTaskQueue, kWorkStealingTaskQueue, kPushStrategyTaskQueue };
 
 OsScheduling Parse(const yaml_config::YamlConfig& value,
                    formats::parse::To<OsScheduling>);
